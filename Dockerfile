@@ -6,7 +6,6 @@ RUN apt-get update && apt-get install -y npm
 
 # Set the working directory
 WORKDIR /app
-
 ## Copy the Cargo.toml and Cargo.lock files to leverage Docker caching
 #COPY Cargo.toml Cargo.lock ./
 #
