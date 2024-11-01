@@ -34,6 +34,12 @@ jobs:
           touch sqlite.db
           chmod 666 sqlite.db
 
+      - name: Run database migrations
+        run: |
+          cargo install sqlx-cli -F sqlite
+          sqlx database create
+          sqlx migrate run
+
       - name: Build CSS with Tailwind
         run: |
           cd tailwind
