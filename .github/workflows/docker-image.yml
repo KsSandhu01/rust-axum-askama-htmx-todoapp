@@ -1,52 +1,57 @@
-name: CI/CD Pipeline
+name: Build, Publish and Deploy to Kubernetes
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
+
+env:
+  REGISTRY: registry.digitalocean.com
+  IMAGE_NAME: registry.digitalocean.com/rustxregistry/rustx-container
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
 
     steps:
-      - name: Check out the code
-        uses: actions/checkout@v2
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into DigitalOcean Container Registry
+        uses: docker/login-action@v3
         with:
-          toolchain: stable
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Install npm dependencies
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+
+      - name: Create .kube directory
+        run: mkdir -p $HOME/.kube
+
+      - name: Set KUBECONFIG
+        run: echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+
+      - name: Install kubectl
         run: |
-          cd tailwind
-          npm install
+          curl -LO "https://dl.k8s.io/release/v1.22.0/bin/linux/amd64/kubectl"
+          chmod +x ./kubectl
+          sudo mv ./kubectl /usr/local/bin/kubectl
 
-      - name: Set up environment variables
-        run: echo "DATABASE_URL=sqlite://sqlite.db" >> $GITHUB_ENV
-
-      - name: Create SQLite Database
+      - name: Apply Kubernetes Deployment
         run: |
-          touch sqlite.db
-          chmod 666 sqlite.db
-
-      - name: Run database migrations
-        run: |
-          cargo install sqlx-cli -F sqlite
-          sqlx database create
-          sqlx migrate run
-
-      - name: Build CSS with Tailwind
-        run: |
-          cd tailwind
-          npm run build-css-prod
-
-      - name: Build Rust Application
-        run: cargo build --release
-
-      - name: Run Tests
-        run: cargo test --verbose
+          kubectl apply -f rust_deployment.yaml
