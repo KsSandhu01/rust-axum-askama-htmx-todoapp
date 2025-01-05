@@ -30,7 +30,7 @@ spec:
       # Naam van de container binnen de pod
       - name: rustxregistry
         # De Docker-image die gebruikt wordt, inclusief tag met de commit SHA voor versioning
-        image: registry.digitalocean.com/rustxregistry/KsSandhu01/rust-axum-askama-htmx-todoapp:sha-${{ github.sha }} 
+        image: registry.digitalocean.com/rustxregistry/kssandhu01/rust-axum-askama-htmx-todoapp:sha-${{ github.sha }} 
         ports:
         # De poort waarop de applicatie luistert binnen de container
         - containerPort: 8081
