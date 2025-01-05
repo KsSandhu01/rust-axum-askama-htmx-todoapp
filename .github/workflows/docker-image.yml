@@ -1,4 +1,4 @@
-name: Build, Publish and Deploy to Kubernetes
+name: eertseBuild, Publish and Deploy to Kubernetes
 
 on:
   push:
