@@ -4,7 +4,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   # Naam van het deployment voor identificatie
-  name: rustx-deployment
+  name: rust deployment
 spec:
   # Het aantal replicaties van de applicatie dat moet draaien. Handig voor hoge beschikbaarheid
   replicas: 3 
@@ -19,22 +19,22 @@ spec:
   selector:
     matchLabels:
       # Zorgt ervoor dat de juiste pods worden geselecteerd op basis van labels
-      app: rustx-app
+      app: rust
   template:
     metadata:
       labels:
         # Het label dat gebruikt wordt om de pod te identificeren en matchen met de deployment
-        app: rustx-app
+        app: rust
     spec:
       containers:
       # Naam van de container binnen de pod
-      - name: rustx-container
+      - name: rustxregistry
         # De Docker-image die gebruikt wordt, inclusief tag met de commit SHA voor versioning
-        image: registry.digitalocean.com/rustxregistry/rustx-container:sha-${{ github.sha }} 
+        image: registry.digitalocean.com/rustxregistry/KsSandhu01/rust-axum-askama-htmx-todoapp:sha-${{ github.sha }} 
         ports:
         # De poort waarop de applicatie luistert binnen de container
-        - containerPort: 8080
-        # Stelt CPU- en geheugenlimieten in om resourcegebruik te beperken
+        - containerPort: 8081
+        # Stelt CPU- en geheugenlimieten in om resourcegebruik te beperken (Best Practice 10: Beperk container resourcegebruik)
         resources:
           limits:
             memory: "512Mi"
@@ -46,25 +46,25 @@ spec:
         imagePullPolicy: Always
       imagePullSecrets:
       # Verwijst naar de geheimen om toegang te krijgen tot het container registry
-      - name: rustx-registry-secret
+      - name: rustxregistry
 ---
 # Dit is een Kubernetes Service resource. Een Service zorgt voor netwerktoegang tot de pods in het cluster
 apiVersion: v1
 kind: Service
 metadata:
   # Naam van de service voor identificatie
-  name: rustx-service
+  name: rust-service
 spec:
-  # De service koppelt aan de pods die het 'app: rustx-app' label hebben
+  # De service koppelt aan de pods die het 'app: rust' label hebben
   selector:
-    # De service zoekt pods met het label 'app: rustx-app'
-    app: rustx-app
+    # De service zoekt pods met het label 'app: rust'
+    app: rust
   ports:
   # Het netwerkprotocol dat de service gebruikt (in dit geval TCP)
   - protocol: TCP
     # Externe poort waarop de service beschikbaar is
     port: 80
     # Interne poort waarop de applicatie in de container luistert
-    targetPort: 8080
+    targetPort: 8081
   # De service krijgt een extern IP-adres, zodat het bereikbaar is van buiten het cluster
   type: LoadBalancer
