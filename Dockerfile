@@ -1,16 +1,11 @@
-# Use the official Rust image as a base
-FROM rust:1.77 AS builder
+# Gebruik een nieuwere versie van de officiële Rust image
+FROM rust:1.78 AS builder
 
 # Install npm (which comes with Node.js)
 RUN apt-get update && apt-get install -y npm
 
 # Set the working directory
 WORKDIR /app
-## Copy the Cargo.toml and Cargo.lock files to leverage Docker caching
-#COPY Cargo.toml Cargo.lock ./
-#
-## Fetch dependencies for caching
-#RUN cargo fetch
 
 # Copy the rest of the source code
 COPY . .
@@ -20,7 +15,8 @@ RUN cd tailwind && npm install && npm run build-css-prod || true
 
 ENV DATABASE_URL=sqlite://sqlite.db
 
-RUN cargo install sqlx-cli -F sqlite
+# Installeer sqlx-cli met de juiste versie
+RUN cargo install sqlx-cli -F sqlite --locked
 RUN sqlx database create
 RUN sqlx migrate run
 

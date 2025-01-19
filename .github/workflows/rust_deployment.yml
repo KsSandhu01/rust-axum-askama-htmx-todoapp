@@ -1,70 +1,83 @@
-# Dit is een Kubernetes Deployment resource. Een Deployment zorgt voor het beheren van een groep identieke pods
-# Het helpt bij het automatisch schalen en beheren van applicatie-updates zonder downtime
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  # Naam van het deployment voor identificatie
-  name: rust deployment
-spec:
-  # Het aantal replicaties van de applicatie dat moet draaien. Handig voor hoge beschikbaarheid
-  replicas: 3 
-  strategy:
-    # Rolling update zorgt voor een geleidelijke vervanging van pods bij een update
-    type: RollingUpdate  
-    rollingUpdate:
-      # Maximaal 1 pod mag tegelijkertijd onbeschikbaar zijn tijdens een update
-      maxUnavailable: 1  
-      # Maximaal 1 extra pod mag opgestart worden tijdens een update boven het gewenste aantal replicas
-      maxSurge: 1  
-  selector:
-    matchLabels:
-      # Zorgt ervoor dat de juiste pods worden geselecteerd op basis van labels
-      app: rust
-  template:
-    metadata:
-      labels:
-        # Het label dat gebruikt wordt om de pod te identificeren en matchen met de deployment
-        app: rust
-    spec:
-      containers:
-      # Naam van de container binnen de pod
-      - name: rustxregistry
-        # De Docker-image die gebruikt wordt, inclusief tag met de commit SHA voor versioning
-        image: registry.digitalocean.com/rustxregistry/kssandhu01/rust-axum-askama-htmx-todoapp:sha-${{ github.sha }} 
-        ports:
-        # De poort waarop de applicatie luistert binnen de container
-        - containerPort: 8081
-        # Stelt CPU- en geheugenlimieten in om resourcegebruik te beperken (Best Practice 10: Beperk container resourcegebruik)
-        resources:
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-        # De image wordt altijd opnieuw getrokken, handig voor het updaten naar nieuwe versies
-        imagePullPolicy: Always
-      imagePullSecrets:
-      # Verwijst naar de geheimen om toegang te krijgen tot het container registry
-      - name: rustxregistry
----
-# Dit is een Kubernetes Service resource. Een Service zorgt voor netwerktoegang tot de pods in het cluster
-apiVersion: v1
-kind: Service
-metadata:
-  # Naam van de service voor identificatie
-  name: rust-service
-spec:
-  # De service koppelt aan de pods die het 'app: rust' label hebben
-  selector:
-    # De service zoekt pods met het label 'app: rust'
-    app: rust
-  ports:
-  # Het netwerkprotocol dat de service gebruikt (in dit geval TCP)
-  - protocol: TCP
-    # Externe poort waarop de service beschikbaar is
-    port: 80
-    # Interne poort waarop de applicatie in de container luistert
-    targetPort: 8081
-  # De service krijgt een extern IP-adres, zodat het bereikbaar is van buiten het cluster
-  type: LoadBalancer
+name: Build and Deploy Rust App
+
+on:
+  push:
+    branches:
+      - main  # Change this to your default branch if different
+
+jobs:
+  build:
+    name: Build Rust App
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'  # Adjust based on your needs
+
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --features sqlite
+
+      - name: Set Up Environment Variables
+        run: echo "DATABASE_URL=sqlite://data.db" >> $GITHUB_ENV
+
+      - name: Apply Database Migrations
+        run: |
+          sqlx database create
+          sqlx migrate run
+
+      - name: Build TailwindCSS Assets
+        working-directory: ./tailwind
+        run: |
+          npm install
+          npm run build-css-prod
+
+      - name: Build Rust App
+        run: cargo build --release
+
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          registry: docker.io  # Docker Hub registry
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Docker Image to Docker Hub
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: kssandhu01/rust-axum-askama-htmx:latest
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Save DigitalOcean kubeconfig
+        run: |
+          doctl kubernetes cluster kubeconfig save ${{ secrets.DIGITALOCEAN_CLUSTER_NAME }}
+      
+      - name: Deploy to DigitalOcean Kubernetes
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+          kubectl rollout status deployment/rust-axum-app
+
+      - name: Verify Deployment
+        run: |
+          kubectl get services rust-axum-app-service
+          echo "Deployment completed successfully!"
