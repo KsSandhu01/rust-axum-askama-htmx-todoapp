@@ -5,7 +5,6 @@ metadata:
   labels:
     app: rust-axum-app
 spec:
-  progressDeadlineSeconds: 600  # Increased from default 600
   replicas: 2
   selector:
     matchLabels:
@@ -22,23 +21,24 @@ spec:
             - containerPort: 8082
           resources:
             limits:
-              cpu: "1"
-              memory: "512Mi"
-            requests:
               cpu: "0.5"
               memory: "256Mi"
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 8082
-            initialDelaySeconds: 10
-            periodSeconds: 5
+            requests:
+              cpu: "0.25"
+              memory: "128Mi"
           livenessProbe:
             httpGet:
               path: /
               port: 8082
-            initialDelaySeconds: 15
+            initialDelaySeconds: 5
             periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      nodeSelector: {} # Optional: Add constraints for node selection
 ---
 apiVersion: v1
 kind: Service
